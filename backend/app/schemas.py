@@ -18,3 +18,14 @@ class DocumentResponse(DocumentCreate):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+    content: str | None = None
+    page_count: int | None = None
+
+
+class DocumentContentResponse(BaseModel):
+    id: int
+    title: str
+    content: str | None
+    page_count: int | None
+
+    model_config = ConfigDict(from_attributes=True)

@@ -16,6 +16,7 @@ from .database import Base
 
 
 class Category(Base):
+    
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(
@@ -33,7 +34,7 @@ class Category(Base):
 
 class Document(Base):
     __tablename__ = "documents"
-
+    from sqlalchemy import Integer
     id: Mapped[int] = mapped_column(
         BigInteger,
         Identity(always=False),
@@ -77,4 +78,14 @@ class Document(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False
+    )
+
+    content: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    page_count: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True
     )
