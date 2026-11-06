@@ -13,7 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
-
+from sqlalchemy import Integer
 
 class Category(Base):
     
@@ -88,4 +88,37 @@ class Document(Base):
     page_count: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True
+    )
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True
+    )
+
+    document_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "documents.id",
+            ondelete="CASCADE"
+        ),
+        nullable=False
+    )
+
+    chunk_index: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False
+    )
+
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
     )

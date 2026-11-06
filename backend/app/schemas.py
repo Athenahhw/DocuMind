@@ -29,3 +29,11 @@ class DocumentContentResponse(BaseModel):
     page_count: int | None
 
     model_config = ConfigDict(from_attributes=True)
+
+class DocumentChunkResponse(BaseModel):
+    id: int
+    document_id: int
+    chunk_index: int
+    content: str
+
+    model_config = ConfigDict(from_attributes=True)
