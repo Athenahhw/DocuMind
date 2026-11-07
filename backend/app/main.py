@@ -1,7 +1,7 @@
 
 from pathlib import Path
 from uuid import uuid4
-
+from .embeddings import generate_embeddings
 from fastapi import (
     FastAPI,
     Depends,
@@ -160,7 +160,7 @@ async def upload_document(
 
         # Split extracted text into chunks
         chunks = split_text(pdf_data["content"])
-
+        embeddings = generate_embeddings(chunks)
         # Create document record
         document = Document(
             title=title,
@@ -179,13 +179,18 @@ async def upload_document(
         db.flush()
 
         # Create chunks
-        for index, chunk_text in enumerate(chunks):
+        
+        for index, (chunk_text, vector) in enumerate(
+            zip(chunks, embeddings)
+        ):
             chunk = DocumentChunk(
                 document_id=document.id,
                 chunk_index=index,
                 content=chunk_text,
+                embedding=vector,
             )
             db.add(chunk)
+
 
         # Commit document and chunks together
         db.commit()

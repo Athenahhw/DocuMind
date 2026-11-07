@@ -1,6 +1,6 @@
 
 from datetime import datetime
-
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     ForeignKey,
@@ -121,4 +121,9 @@ class DocumentChunk(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False
+    )
+
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(384),
+        nullable=True
     )
