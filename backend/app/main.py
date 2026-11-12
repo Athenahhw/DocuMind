@@ -1,4 +1,5 @@
-
+from .search import semantic_search
+from .rag import answer_question
 from pathlib import Path
 from uuid import uuid4
 from .embeddings import generate_embeddings
@@ -14,7 +15,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
+from .rag import answer_question
 from .database import get_db
 from .models import Document, DocumentChunk
 from .schemas import (
@@ -22,6 +23,10 @@ from .schemas import (
     DocumentResponse,
     DocumentContentResponse,
     DocumentChunkResponse,
+    SearchRequest,
+    SearchResponse,
+    AskRequest,
+    AskResponse,
 )
 from .pdf_processor import extract_pdf_text
 from .chunking import split_text
@@ -359,3 +364,86 @@ def delete_document(
     return {
         "message": "Document deleted successfully"
     }
+
+
+@app.post("/search", response_model=SearchResponse)
+def search_documents(
+    request: SearchRequest,
+    db: Session = Depends(get_db),
+):
+    if not request.query.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Search query cannot be empty",
+        )
+
+    if not 1 <= request.top_k <= 20:
+        raise HTTPException(
+            status_code=400,
+            detail="top_k must be between 1 and 20",
+        )
+
+    if request.document_id is not None:
+        document = db.get(Document, request.document_id)
+
+        if document is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Document not found",
+            )
+
+    results = semantic_search(
+        db=db,
+        query=request.query,
+        top_k=request.top_k,
+        document_id=request.document_id,
+    )
+
+    return {
+        "query": request.query,
+        "total_results": len(results),
+        "results": results,
+    }
+
+
+
+@app.post("/ask", response_model=AskResponse)
+def ask_document(
+    request: AskRequest,
+    db: Session = Depends(get_db),
+):
+    if not request.question.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty",
+        )
+
+    if not 1 <= request.top_k <= 20:
+        raise HTTPException(
+            status_code=400,
+            detail="top_k must be between 1 and 20",
+        )
+
+    if request.document_id is not None:
+        document = db.get(Document, request.document_id)
+
+        if document is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Document not found",
+            )
+
+    try:
+        return answer_question(
+            db=db,
+            question=request.question,
+            top_k=request.top_k,
+            document_id=request.document_id,
+        )
+    except Exception:
+        import logging
+        logging.exception("RAG request failed")
+        raise HTTPException(
+            status_code=502,
+            detail="AI answer generation failed. Check server logs.",
+        )

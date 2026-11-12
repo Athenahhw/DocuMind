@@ -37,3 +37,35 @@ class DocumentChunkResponse(BaseModel):
     content: str
 
     model_config = ConfigDict(from_attributes=True)
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: int = 5
+    document_id: int | None = None
+
+
+class SearchResult(BaseModel):
+    chunk_id: int
+    document_id: int
+    document_title: str
+    chunk_index: int
+    content: str
+    similarity: float
+
+
+class SearchResponse(BaseModel):
+    query: str
+    total_results: int
+    results: list[SearchResult]
+
+
+class AskRequest(BaseModel):
+    question: str
+    top_k: int = 5
+    document_id: int | None = None
+
+
+class AskResponse(BaseModel):
+    question: str
+    answer: str
+    sources: list[SearchResult]
