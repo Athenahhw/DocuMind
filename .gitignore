@@ -1,10 +1,11 @@
 
 # Python
 __pycache__/
+*.pyc
 *.py[cod]
 .venv/
 .pytest_cache/
-
+!uploads/.gitkeep
 # Environment variables
 .env
 .env.*
