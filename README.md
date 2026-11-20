@@ -1,177 +1,186 @@
 # DocuMind
 
-**An AI-Powered Document Management and Knowledge Base System**
+**AI-Powered Document Management & Knowledge Base**
 
-DocuMind is a full-stack AI application that allows users to upload PDF documents, search their contents using semantic similarity, and ask questions through Retrieval-Augmented Generation (RAG).
+DocuMind is a full-stack AI application that transforms PDF documents into a searchable knowledge base. Users can upload documents, perform semantic search, and ask natural-language questions through a Retrieval-Augmented Generation (RAG) pipeline.
 
-The system combines document processing, vector embeddings, PostgreSQL vector search, and Google Gemini to generate answers grounded in uploaded documents.
+The project combines document processing, vector embeddings, PostgreSQL, and the Google Gemini API in a containerized application.
 
 ## Features
 
-- **PDF Management:** Upload, process, view, and delete PDF documents.
-- **Text Extraction:** Extract text from PDF files using PyMuPDF.
-- **Text Chunking:** Split extracted text into overlapping chunks.
-- **Vector Embeddings:** Generate semantic embeddings using Sentence Transformers.
-- **Semantic Search:** Retrieve relevant document passages using PostgreSQL and pgvector.
-- **AI Question Answering:** Generate document-grounded answers using Gemini Flash Lite.
-- **Source References:** Display retrieved document chunks alongside AI answers.
-- **Web Interface:** Interact with the system through Streamlit.
-- **Chat History:** Review questions and answers during the current browser session.
+- **PDF Management:** Upload, view, and delete PDF documents.
+- **Text Extraction:** Automatically extract text from uploaded PDFs using PyMuPDF.
+- **Document Chunking:** Split extracted content into smaller, overlapping passages.
+- **Vector Embeddings:** Generate 384-dimensional embeddings using Sentence Transformers.
+- **Semantic Search:** Retrieve relevant document passages using cosine similarity and pgvector.
+- **AI Question Answering:** Generate answers grounded in retrieved passages using Google Gemini.
+- **Source References:** Display supporting document passages alongside AI-generated answers.
+- **Docker Support:** Run the frontend, backend, and PostgreSQL database using Docker Compose.
+- **Automated Testing:** Validate core application functionality with Pytest.
 
 ## Tech Stack
 
-| Layer | Technologies |
+| Category | Technology |
 |---|---|
-| Backend | Python, FastAPI, SQLAlchemy |
+| Language | Python |
+| Backend | FastAPI |
 | Frontend | Streamlit |
 | Database | PostgreSQL |
 | Vector Database | pgvector |
-| Embedding Model | all-MiniLM-L6-v2 |
-| LLM | Google Gemini Flash Lite |
 | PDF Processing | PyMuPDF |
+| Embeddings | Sentence Transformers (all-MiniLM-L6-v2) |
+| LLM | Google Gemini API |
+| Containerization | Docker, Docker Compose |
 | Testing | Pytest |
 
 ## System Architecture
 
 ```text
-User
- |
- v
-Streamlit Frontend
- |
- v
-FastAPI Backend
- |
- +-- PDF Upload
- |     |
- |     v
- |   PyMuPDF
- |     |
- |     v
- |   Text Chunking
- |     |
- |     v
- |   Sentence Transformers
- |     |
- |     v
- |   PostgreSQL + pgvector
- |
- +-- User Question
-       |
-       v
-    Embedding Model
-       |
-       v
-    Vector Similarity Search
-       |
-       v
-    Relevant Document Chunks
-       |
-       v
-    Google Gemini API
-       |
-       v
-    Answer + Source References
+                   User
+                    |
+                    v
+             Streamlit Frontend
+                    |
+                    v
+               FastAPI Backend
+                    |
+          +---------+----------+
+          |                    |
+          v                    v
+     PDF Processing       RAG Pipeline
+          |                    |
+          v                    v
+    Text Extraction      Semantic Search
+          |                    |
+          v                    v
+       Chunking          Relevant Chunks
+          |                    |
+          v                    v
+   Vector Embeddings      Gemini API
+          |                    |
+          +---------+----------+
+                    |
+                    v
+          PostgreSQL + pgvector
 ```
+
+## Application Screenshots
+
+### Dashboard
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+Manage uploaded documents and monitor processing status.
+
+### PDF Upload
+
+![PDF Upload](docs/screenshots/upload.png)
+
+Upload PDF documents for automatic text extraction, chunking, and embedding generation.
+
+### Semantic Search
+
+![Semantic Search](docs/screenshots/semantic-search.png)
+
+Find relevant document passages using vector similarity search.
+
+### AI Question Answering
+
+![Ask AI](docs/screenshots/ask-ai.png)
+
+Ask questions about uploaded documents and receive AI-generated answers with source references.
 
 ## Getting Started
 
-### 1. Clone the repository
+### Prerequisites
+
+- Docker Desktop
+- Docker Compose
+- Google Gemini API key
+
+### Installation
+
+**1. Clone the repository**
 
 ```bash
 git clone https://github.com/Athenahhw/DocuMind.git
 cd DocuMind
 ```
 
-### 2. Create a virtual environment
+**2. Configure environment variables**
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+cp .env.example .env
 ```
 
-### 3. Install dependencies
+Update `.env` with your Gemini API key, supported Gemini model, and PostgreSQL password.
+
+**3. Build and start the application**
 
 ```bash
-pip install -r requirements.txt
+docker compose up -d --build
 ```
 
-### 4. Configure environment variables
+**4. Access the application**
 
-Create a `.env` file:
+- Frontend: http://localhost:8501
+- FastAPI documentation: http://localhost:8000/docs
+- Health check: http://localhost:8000/health
 
-```dotenv
-DATABASE_URL=postgresql+psycopg://localhost/documind
-GEMINI_API_KEY=your_api_key_here
-GEMINI_MODEL=gemini-3.5-flash-lite
-```
-
-Never commit your actual API keys to GitHub.
-
-### 5. Set up PostgreSQL
-
-Create a PostgreSQL database named `documind`, enable the `vector` extension, and apply the project's database schema.
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
-
-### 6. Start the backend
+**5. Stop the application**
 
 ```bash
-python -m uvicorn backend.app.main:app --reload
+docker compose down
 ```
 
-API documentation:
+Docker volumes preserve the database and uploaded files between ordinary restarts.
 
-`http://127.0.0.1:8000/docs`
+**Database initialization:** The PostgreSQL service must initialize the schema in `database/init.sql` on first startup.
 
-### 7. Start the frontend
+## Testing
 
-Open another terminal:
-
-```bash
-python -m streamlit run frontend/app.py
-```
-
-Web interface:
-
-`http://localhost:8501`
-
-## Running Tests
+Run the automated tests from the project root:
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-The test suite includes unit tests for text chunking and semantic search, along with basic FastAPI smoke tests.
+The test suite covers text chunking, semantic search behavior, and API endpoint registration.
 
-## Screenshots
+## How RAG Works
 
-Add screenshots of the following features:
+1. A user uploads a PDF document.
+2. PyMuPDF extracts the text.
+3. The text is split into overlapping chunks.
+4. Sentence Transformers generates embeddings for each chunk.
+5. PostgreSQL stores the document, chunks, and vectors.
+6. A user submits a natural-language question.
+7. The question is converted into an embedding.
+8. pgvector retrieves semantically relevant chunks.
+9. Retrieved passages are provided as context to Gemini.
+10. Gemini generates an answer with supporting source references.
 
-- Dashboard
-- PDF Upload
-- Semantic Search
-- AI Question Answering
+## Limitations
 
-## Current Limitations
-
-- Only PDF documents are supported.
-- Text extraction may not work for scanned PDFs without OCR.
-- Chat history is stored only in the current Streamlit session.
-- Source references identify document chunks rather than exact PDF pages.
-- Semantic search relevance depends on the embedding model and similarity threshold.
+- The current version is designed primarily for local, single-user use.
+- A publicly hosted demo is not currently available.
+- Scanned PDFs may require OCR before their text can be processed.
+- AI-generated answers may contain inaccuracies.
+- Authentication and multi-user document isolation have not yet been implemented.
 
 ## Future Improvements
 
-- Improve the web interface and user experience.
-- Add page-level source citations.
-- Support additional document formats.
-- Add persistent conversation history.
-- Containerize the application with Docker.
-- Deploy an online demo.
+- User authentication and access control
+- Multi-user document management
+- OCR support for scanned PDFs
+- Hybrid keyword and vector search
+- Improved retrieval evaluation
+- Cloud deployment
 
 ## Author
 
-Developed by [Athenahhw](https://github.com/Athenahhw).
+**Athena Wang**
+
+Computer Science Undergraduate
+
+[GitHub](https://github.com/Athenahhw/DocuMind)

@@ -447,3 +447,10 @@ def ask_document(
             status_code=502,
             detail="AI answer generation failed. Check server logs.",
         )
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "service": "DocuMind API"
+    }

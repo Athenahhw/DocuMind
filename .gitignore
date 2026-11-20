@@ -6,6 +6,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 !uploads/.gitkeep
+ .env.example
 # Environment variables
 .env
 .env.*
@@ -22,3 +23,4 @@ uploads/
 
 # Logs
 *.log
+.dockerignore

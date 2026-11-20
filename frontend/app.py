@@ -1,58 +1,346 @@
 
 import os
-
+import html
 import requests
 import streamlit as st
 
-
-# ==========================================
-# Configuration
-# ==========================================
-
 API_URL = os.getenv(
     "DOCUMIND_API_URL",
-    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8000"
 ).rstrip("/")
 
 st.set_page_config(
-    page_title="DocuMind",
-    page_icon="📚",
+    page_title="DocuMind — Knowledge Workspace",
+    page_icon="◈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
+# -----------------------------------------
+# STATE
+# -----------------------------------------
 
-# ==========================================
-# Session State
-# ==========================================
+defaults = {
+    "page": "Overview",
+    "chat_history": [],
+    "search_results": None,
+    "flash": None,
+}
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-if "flash_message" not in st.session_state:
-    st.session_state.flash_message = None
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
-# ==========================================
-# API Helper
-# ==========================================
+# -----------------------------------------
+# STYLES
+# -----------------------------------------
 
-def api_request(method, endpoint, **kwargs):
-    """
-    Send a request to the FastAPI backend.
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-    Returns:
-        (success, data)
-    """
+:root {
+    --ink: #171D2B;
+    --muted: #788397;
+    --border: #E9EDF3;
+    --accent: #4F46E5;
+}
 
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+}
+
+.stApp {
+    background: #FFFFFF;
+    color: var(--ink);
+}
+
+[data-testid="stHeader"] {
+    background: transparent;
+}
+
+[data-testid="stSidebar"] {
+    background: #FAFBFD;
+    border-right: 1px solid #E9EDF3;
+    min-width: 255px;
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    padding: 2rem 1.15rem;
+}
+
+.block-container {
+    max-width: 1320px;
+    padding: 2.5rem 3.5rem 5rem;
+}
+
+h1, h2, h3 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -.045em;
+    color: #171D2B;
+}
+
+h1 {
+    font-size: 2.15rem !important;
+    font-weight: 800 !important;
+}
+
+h2 {
+    font-size: 1.25rem !important;
+    font-weight: 750 !important;
+}
+
+p {
+    color: #586478;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] > div {
+    border: 1px solid #E9EDF3 !important;
+    border-radius: 14px !important;
+    background: #FFFFFF;
+}
+
+[data-testid="stMetric"] {
+    padding: 20px 22px;
+    border: 1px solid #E9EDF3;
+    border-radius: 14px;
+    background: #FFFFFF;
+}
+
+[data-testid="stMetricLabel"] {
+    color: #788397;
+    font-size: .82rem;
+}
+
+[data-testid="stMetricValue"] {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    font-size: 2rem;
+    color: #171D2B;
+}
+
+.stButton > button {
+    border-radius: 9px;
+    font-weight: 600;
+    border-color: #E5EAF1;
+    transition: .15s;
+}
+
+.stButton > button[kind="primary"] {
+    background: #4F46E5;
+    border-color: #4F46E5;
+    color: white;
+}
+
+.stButton > button[kind="primary"]:hover {
+    background: #4338CA;
+    border-color: #4338CA;
+    color: white;
+}
+
+[data-testid="stSidebar"] .stButton > button {
+    width: 100%;
+    text-align: left;
+    justify-content: flex-start;
+    border: none;
+    background: transparent;
+    color: #586478;
+    padding: 12px 14px;
+    box-shadow: none;
+}
+
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: #EEF0F8;
+    color: #252A44;
+}
+
+[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+    background: #EBEBFF;
+    color: #4338CA;
+    border: none;
+}
+
+[data-testid="stFileUploaderDropzone"] {
+    background: #FAFBFF;
+    border: 1.5px dashed #B8C3D8;
+    border-radius: 12px;
+    padding: 30px;
+}
+
+[data-testid="stChatMessage"] {
+    background: #FFFFFF;
+    border: 1px solid #E9EDF3;
+    border-radius: 14px;
+    margin-bottom: 12px;
+}
+
+[data-testid="stExpander"] {
+    border: 1px solid #E9EDF3;
+    border-radius: 10px;
+    background: #FFFFFF;
+}
+
+.dm-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 3px 5px 32px;
+}
+
+.dm-logo {
+    width: 39px;
+    height: 39px;
+    border-radius: 11px;
+    background: #171D2B;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.dm-brand-name {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.12rem;
+    font-weight: 800;
+    letter-spacing: -.04em;
+    color: #171D2B;
+}
+
+.dm-brand-sub {
+    font-size: .7rem;
+    color: #9AA4B5;
+}
+
+.dm-nav-label {
+    font-size: .67rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    color: #A1AABB;
+    margin: 9px 12px 10px;
+}
+
+.dm-eyebrow {
+    font-size: .75rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #6366F1;
+    margin-bottom: 12px;
+}
+
+.dm-description {
+    color: #8A94A6;
+    font-size: .95rem;
+    margin-top: -7px;
+    margin-bottom: 26px;
+}
+
+.dm-section {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.08rem;
+    font-weight: 800;
+    letter-spacing: -.025em;
+    margin: 24px 0 14px;
+    color: #171D2B;
+}
+
+.dm-file-title {
+    font-weight: 700;
+    color: #252D3E;
+    overflow-wrap: anywhere;
+}
+
+.dm-file-meta {
+    color: #94A0B1;
+    font-size: .77rem;
+    margin-top: 5px;
+}
+
+.dm-pill {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 7px;
+    font-size: .72rem;
+    font-weight: 700;
+    background: #F1F3F7;
+    color: #687386;
+}
+
+.dm-pill.ready {
+    background: #E9F7EF;
+    color: #228553;
+}
+
+.dm-pill.pending {
+    background: #FFF5E4;
+    color: #A87318;
+}
+
+.dm-hero {
+    background: #F6F7FF;
+    border: 1px solid #ECEEFF;
+    border-radius: 16px;
+    padding: 28px 30px;
+    margin: 14px 0 26px;
+}
+
+.dm-hero-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #252B49;
+    margin-bottom: 8px;
+}
+
+.dm-hero-sub {
+    color: #7A83A0;
+    font-size: .87rem;
+    line-height: 1.7;
+}
+
+.dm-result-number {
+    color: #A1AABB;
+    font-size: .78rem;
+    font-weight: 800;
+}
+
+.dm-sidebar-footer {
+    color: #A1AABB;
+    font-size: .72rem;
+    line-height: 1.9;
+}
+
+hr {
+    border-color: #EEF0F5 !important;
+}
+
+@media (max-width: 900px) {
+    .block-container {
+        padding: 1.6rem 1rem 3rem;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# -----------------------------------------
+# API
+# -----------------------------------------
+
+def esc(value):
+    return html.escape(str(value), quote=True)
+
+
+def api(method, path, **kwargs):
     try:
         response = requests.request(
             method,
-            f"{API_URL}{endpoint}",
+            f"{API_URL}{path}",
             timeout=120,
             **kwargs,
         )
-
         response.raise_for_status()
 
         if not response.content:
@@ -61,39 +349,25 @@ def api_request(method, endpoint, **kwargs):
         return True, response.json()
 
     except requests.exceptions.RequestException as exc:
-        detail = str(exc)
-
+        message = str(exc)
         if exc.response is not None:
             try:
-                error_data = exc.response.json()
-
-                if isinstance(error_data, dict):
-                    detail = error_data.get(
-                        "detail",
-                        detail,
-                    )
+                payload = exc.response.json()
+                if isinstance(payload, dict):
+                    message = payload.get("detail", message)
             except ValueError:
                 pass
-
-        st.error(f"API request failed: {detail}")
+        st.error(f"Request failed: {message}")
         return False, None
 
     except ValueError:
-        st.error("The API returned invalid JSON.")
+        st.error("Invalid JSON response from backend.")
         return False, None
 
 
-# ==========================================
-# Document Helpers
-# ==========================================
-
-def load_documents():
-    success, result = api_request(
-        "GET",
-        "/documents",
-    )
-
-    if not success:
+def get_documents():
+    ok, result = api("GET", "/documents")
+    if not ok:
         return []
 
     if isinstance(result, list):
@@ -105,567 +379,630 @@ def load_documents():
     return []
 
 
-def get_document_options(documents):
-    options = {}
-
-    for doc in documents:
-        label = (
-            f"{doc['id']} — "
-            f"{doc.get('title', 'Untitled')}"
-        )
-
-        options[label] = doc["id"]
-
-    return options
+def document_choices(docs):
+    return {
+        f"{d['id']} — {d.get('title', 'Untitled')}": d["id"]
+        for d in docs
+    }
 
 
-def show_sources(sources):
+def heading(label, title, description):
+    st.markdown(
+        f'<div class="dm-eyebrow">{esc(label)}</div>',
+        unsafe_allow_html=True,
+    )
+    st.title(title)
+    st.markdown(
+        f'<div class="dm-description">{esc(description)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def navigate(target):
+    st.session_state.page = target
+    st.rerun()
+
+
+def render_sources(sources):
     if not sources:
-        st.info("No sources available.")
+        st.caption("No sources available.")
         return
 
-    for index, source in enumerate(
-        sources,
-        start=1,
-    ):
-        title = source.get(
-            "document_title",
-            "Untitled",
-        )
-
-        chunk_index = source.get(
-            "chunk_index",
-            "?",
-        )
-
-        similarity = source.get(
-            "similarity",
-            0,
-        )
+    for index, source in enumerate(sources, 1):
+        name = source.get("document_title", "Untitled")
+        chunk = source.get("chunk_index", "?")
+        similarity = source.get("similarity")
 
         with st.expander(
-            f"[Source {index}] {title} "
-            f"— Chunk {chunk_index}"
+            f"Source {index} · {name} · Chunk {chunk}"
         ):
             st.caption(
-                f"Document ID: "
-                f"{source.get('document_id', '?')}"
+                f"Document #{source.get('document_id', '?')}"
             )
+            if isinstance(similarity, (int, float)):
+                st.caption(f"Similarity: {similarity:.3f}")
 
-            st.caption(
-                f"Similarity: {similarity:.3f}"
-            )
-
-            st.write(
-                source.get("content", "")
-            )
+            st.write(source.get("content", ""))
 
 
-# ==========================================
-# Sidebar
-# ==========================================
+# -----------------------------------------
+# SIDEBAR
+# -----------------------------------------
 
-st.sidebar.title("📚 DocuMind")
-st.sidebar.caption(
-    "AI-Powered Document Knowledge Base"
-)
+with st.sidebar:
+    st.markdown("""
+    <div class="dm-brand">
+        <div class="dm-logo">◈</div>
+        <div>
+            <div class="dm-brand-name">DocuMind</div>
+            <div class="dm-brand-sub">Knowledge Workspace</div>
+        </div>
+    </div>
+    <div class="dm-nav-label">WORKSPACE</div>
+    """, unsafe_allow_html=True)
 
-page = st.sidebar.radio(
-    "Navigation",
-    [
-        "Dashboard",
-        "Upload PDF",
-        "Semantic Search",
-        "Ask AI",
-    ],
-)
+    navigation = [
+        ("Overview", "▦  Overview"),
+        ("Library", "▤  Document Library"),
+        ("Upload", "＋  Upload Document"),
+        ("Search", "⌕  Semantic Search"),
+        ("Ask AI", "✧  Ask AI"),
+    ]
 
-st.sidebar.divider()
-
-st.sidebar.caption(
-    "FastAPI · PostgreSQL · pgvector"
-)
-
-st.sidebar.caption(
-    "Gemini Flash Lite · Streamlit"
-)
-
-
-# ==========================================
-# Load Documents
-# ==========================================
-
-documents = load_documents()
-document_options = get_document_options(
-    documents
-)
-
-if st.session_state.flash_message:
-    st.success(
-        st.session_state.flash_message
-    )
-
-    st.session_state.flash_message = None
-
-
-# ==========================================
-# Dashboard
-# ==========================================
-
-if page == "Dashboard":
-
-    st.title("📚 DocuMind Dashboard")
-
-    st.write(
-        "Manage your AI-powered document library."
-    )
-
-    total_documents = len(documents)
-
-    ready_documents = sum(
-        1
-        for doc in documents
-        if doc.get("status") == "ready"
-    )
-
-    pending_documents = sum(
-        1
-        for doc in documents
-        if doc.get("status") == "pending"
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Total Documents",
-        total_documents,
-    )
-
-    col2.metric(
-        "Ready Documents",
-        ready_documents,
-    )
-
-    col3.metric(
-        "Pending Documents",
-        pending_documents,
-    )
+    for key, label in navigation:
+        if st.button(
+            label,
+            key=f"nav_{key}",
+            type=(
+                "primary"
+                if st.session_state.page == key
+                else "secondary"
+            ),
+            use_container_width=True,
+        ):
+            navigate(key)
 
     st.divider()
 
-    st.subheader("Document Library")
+    st.markdown("""
+    <div class="dm-nav-label">SYSTEM</div>
+    <div class="dm-sidebar-footer" style="padding:0 12px">
+        DocuMind v1.0<br>
+        FastAPI · PostgreSQL · pgvector<br>
+        Gemini · Streamlit
+    </div>
+    """, unsafe_allow_html=True)
+
+
+documents = get_documents()
+options = document_choices(documents)
+page = st.session_state.page
+
+if st.session_state.flash:
+    st.success(st.session_state.flash)
+    st.session_state.flash = None
+
+
+# -----------------------------------------
+# OVERVIEW
+# -----------------------------------------
+
+if page == "Overview":
+    heading(
+        "Workspace / Overview",
+        "Your knowledge, in one place.",
+        "A quieter, smarter way to work with your documents.",
+    )
+
+    total = len(documents)
+    ready = sum(
+        str(d.get("status", "")).lower() == "ready"
+        for d in documents
+    )
+    pending = sum(
+        str(d.get("status", "")).lower() == "pending"
+        for d in documents
+    )
+
+    c1, c2, c3 = st.columns(3, gap="medium")
+    c1.metric("Total documents", total)
+    c2.metric("Ready to explore", ready)
+    c3.metric("Pending", pending)
+
+    st.markdown("""
+    <div class="dm-hero">
+        <div class="dm-eyebrow">INTELLIGENT WORKSPACE</div>
+        <div class="dm-hero-title">
+            Your documents have more to say.
+        </div>
+        <div class="dm-hero-sub">
+            Search beyond keywords. Ask meaningful questions.
+            Turn your uploaded files into an accessible
+            knowledge base.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    left, right = st.columns(2, gap="medium")
+
+    with left:
+        if st.button(
+            "✧  Start asking AI",
+            type="primary",
+            use_container_width=True,
+        ):
+            navigate("Ask AI")
+
+    with right:
+        if st.button(
+            "＋  Add a document",
+            use_container_width=True,
+        ):
+            navigate("Upload")
+
+    st.markdown(
+        '<div class="dm-section">Recent documents</div>',
+        unsafe_allow_html=True,
+    )
 
     if not documents:
-        st.info(
-            "No documents found. "
-            "Upload your first PDF."
-        )
+        st.info("No documents yet. Upload your first PDF.")
 
-    else:
-        for doc in documents:
-
-            with st.container(border=True):
-
-                col1, col2 = st.columns(
-                    [5, 1]
-                )
-
-                with col1:
-
-                    st.markdown(
-                        f"**{doc.get('title', 'Untitled')}**"
-                    )
-
-                    page_count = doc.get(
-                        "page_count"
-                    )
-
-                    if page_count is None:
-                        page_count = "N/A"
-
-                    st.caption(
-                        f"ID: {doc['id']} | "
-                        f"Status: "
-                        f"{doc.get('status', 'unknown')} | "
-                        f"Pages: {page_count}"
-                    )
-
-                with col2:
-
-                    with st.popover(
-                        "Delete",
-                        icon="🗑️",
-                    ):
-
-                        st.warning(
-                            "This action permanently "
-                            "deletes the document."
-                        )
-
-                        st.write(
-                            f"Delete "
-                            f"**{doc.get('title', 'Untitled')}**?"
-                        )
-
-                        if st.button(
-                            "Confirm Delete",
-                            key=(
-                                f"confirm_delete_"
-                                f"{doc['id']}"
-                            ),
-                            type="primary",
-                        ):
-
-                            success, _ = api_request(
-                                "DELETE",
-                                f"/documents/{doc['id']}",
-                            )
-
-                            if success:
-
-                                st.session_state.flash_message = (
-                                    "Document deleted successfully."
-                                )
-
-                                st.rerun()
-
-
-# ==========================================
-# Upload PDF
-# ==========================================
-
-elif page == "Upload PDF":
-
-    st.title("📤 Upload PDF")
-
-    st.write(
-        "Upload a PDF to extract its text, "
-        "create chunks, and generate embeddings."
-    )
-
-    uploaded_file = st.file_uploader(
-        "Choose a PDF file",
-        type=["pdf"],
-    )
-
-    title = st.text_input(
-        "Document title (optional)"
-    )
-
-    if uploaded_file is not None:
-
-        st.caption(
-            f"Selected file: "
-            f"{uploaded_file.name}"
-        )
-
-        file_size_mb = (
-            uploaded_file.size
-            / (1024 * 1024)
-        )
-
-        st.caption(
-            f"File size: "
-            f"{file_size_mb:.2f} MB"
-        )
-
-        if file_size_mb > 10:
-
-            st.error(
-                "File size must not exceed 10 MB."
+    for doc in documents[:5]:
+        with st.container(border=True):
+            left, right = st.columns(
+                [5, 1],
+                vertical_alignment="center",
             )
 
-        elif st.button(
-            "Upload and Process",
+            with left:
+                st.markdown(
+                    f'<div class="dm-file-title">'
+                    f'▤ &nbsp; {esc(doc.get("title") or "Untitled")}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f'<div class="dm-file-meta">'
+                    f'Document #{esc(doc.get("id"))}'
+                    f' · {esc(doc.get("page_count") or "—")} pages'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with right:
+                status = str(
+                    doc.get("status") or "unknown"
+                ).lower()
+                css = (
+                    status if status in ("ready", "pending")
+                    else ""
+                )
+                st.markdown(
+                    f'<span class="dm-pill {css}">'
+                    f'{esc(status.title())}</span>',
+                    unsafe_allow_html=True,
+                )
+
+    if len(documents) > 5:
+        if st.button("View all documents →"):
+            navigate("Library")
+
+
+# -----------------------------------------
+# LIBRARY
+# -----------------------------------------
+
+elif page == "Library":
+    heading(
+        "Workspace / Library",
+        "Document library",
+        "Everything you've added to your knowledge base.",
+    )
+
+    left, right = st.columns([4, 1])
+
+    with left:
+        filter_text = st.text_input(
+            "Filter documents",
+            placeholder="Search document names...",
+            label_visibility="collapsed",
+        )
+
+    with right:
+        if st.button(
+            "＋  New document",
             type="primary",
+            use_container_width=True,
         ):
+            navigate("Upload")
 
-            files = {
-                "file": (
-                    uploaded_file.name,
-                    uploaded_file.getvalue(),
-                    "application/pdf",
-                )
-            }
+    filtered = [
+        d for d in documents
+        if filter_text.lower() in str(
+            d.get("title", "")
+        ).lower()
+    ]
 
-            data = {}
+    st.caption(f"{len(filtered)} documents")
 
-            if title.strip():
-                data["title"] = title.strip()
+    if not filtered:
+        st.info("No documents found.")
 
-            with st.spinner(
-                "Processing PDF and "
-                "generating embeddings..."
-            ):
+    for doc in filtered:
+        doc_id = doc["id"]
+        title = doc.get("title") or "Untitled"
+        status = str(doc.get("status") or "unknown").lower()
 
-                success, result = api_request(
-                    "POST",
-                    "/documents/upload",
-                    files=files,
-                    data=data,
-                )
-
-            if success:
-
-                st.success(
-                    "PDF uploaded successfully!"
-                )
-
-                if result is not None:
-                    st.json(result)
-
-                st.info(
-                    "Open Dashboard to view "
-                    "your updated document library."
-                )
-
-
-# ==========================================
-# Semantic Search
-# ==========================================
-
-elif page == "Semantic Search":
-
-    st.title("🔎 Semantic Search")
-
-    st.write(
-        "Find relevant passages "
-        "using vector similarity."
-    )
-
-    query = st.text_input(
-        "Search your documents",
-        placeholder=(
-            "What is a string in Python?"
-        ),
-    )
-
-    selected_document = st.selectbox(
-        "Search scope",
-        ["All documents"]
-        + list(document_options),
-    )
-
-    top_k = st.slider(
-        "Number of results",
-        min_value=1,
-        max_value=10,
-        value=5,
-        key="search_top_k",
-    )
-
-    if st.button(
-        "Search",
-        type="primary",
-    ):
-
-        if not query.strip():
-
-            st.warning(
-                "Please enter a search query."
+        with st.container(border=True):
+            name_col, status_col, action_col = st.columns(
+                [5, 1.4, 1],
+                vertical_alignment="center",
             )
+
+            with name_col:
+                st.markdown(
+                    f'<div class="dm-file-title">'
+                    f'▤ &nbsp; {esc(title)}</div>'
+                    f'<div class="dm-file-meta">'
+                    f'ID {esc(doc_id)} · '
+                    f'{esc(doc.get("page_count") or "—")} pages'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with status_col:
+                css = (
+                    status if status in ("ready", "pending")
+                    else ""
+                )
+                st.markdown(
+                    f'<span class="dm-pill {css}">'
+                    f'{esc(status.title())}</span>',
+                    unsafe_allow_html=True,
+                )
+
+            with action_col:
+                with st.popover("•••"):
+                    st.warning("Deletion is permanent.")
+                    st.write(f"Delete **{title}**?")
+
+                    if st.button(
+                        "Confirm delete",
+                        key=f"delete_{doc_id}",
+                        type="primary",
+                    ):
+                        ok, _ = api(
+                            "DELETE",
+                            f"/documents/{doc_id}",
+                        )
+                        if ok:
+                            st.session_state.flash = (
+                                "Document deleted successfully."
+                            )
+                            st.rerun()
+
+
+# -----------------------------------------
+# UPLOAD
+# -----------------------------------------
+
+elif page == "Upload":
+    heading(
+        "Workspace / Upload",
+        "Bring your documents in.",
+        "Turn PDF files into searchable knowledge.",
+    )
+
+    left, right = st.columns([3, 1.3], gap="large")
+
+    with left:
+        with st.container(border=True):
+            st.markdown("### Upload a PDF")
+            st.caption(
+                "Select a document to extract its text "
+                "and generate vector embeddings."
+            )
+
+            file = st.file_uploader(
+                "Choose your PDF",
+                type=["pdf"],
+                help="Maximum 10 MB",
+            )
+
+            title = st.text_input(
+                "Document title",
+                placeholder="Optional custom title",
+            )
+
+            if file is not None:
+                size = file.size / (1024 * 1024)
+                st.caption(
+                    f"{file.name} · {size:.2f} MB"
+                )
+
+                if size > 10:
+                    st.error("Maximum file size is 10 MB.")
+
+                elif st.button(
+                    "Upload and process →",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    files = {
+                        "file": (
+                            file.name,
+                            file.getvalue(),
+                            "application/pdf",
+                        )
+                    }
+
+                    data = {}
+                    if title.strip():
+                        data["title"] = title.strip()
+
+                    with st.spinner(
+                        "Processing document..."
+                    ):
+                        ok, result = api(
+                            "POST",
+                            "/documents/upload",
+                            files=files,
+                            data=data,
+                        )
+
+                    if ok:
+                        st.success("Upload successful!")
+                        if result is not None:
+                            with st.expander(
+                                "View processing details"
+                            ):
+                                st.json(result)
+
+    with right:
+        st.markdown("### How it works")
+        st.markdown("""
+**01 — Upload**
+
+Add a PDF document.
+
+**02 — Extract**
+
+Text is extracted and divided into chunks.
+
+**03 — Embed**
+
+Chunks are converted into vector embeddings.
+
+**04 — Explore**
+
+Search or ask AI questions about your document.
+""")
+        st.divider()
+        st.caption("Supported format: PDF · Maximum 10 MB")
+
+
+# -----------------------------------------
+# SEARCH
+# -----------------------------------------
+
+elif page == "Search":
+    heading(
+        "Workspace / Discover",
+        "Find what matters.",
+        "Semantic search understands meaning, not just keywords.",
+    )
+
+    settings_col, results_col = st.columns(
+        [1.2, 2.8],
+        gap="large",
+    )
+
+    with settings_col:
+        st.markdown("### Search settings")
+
+        query = st.text_area(
+            "Your query",
+            placeholder="What would you like to find?",
+            height=120,
+        )
+
+        selected = st.selectbox(
+            "Search scope",
+            ["All documents"] + list(options),
+        )
+
+        top_k = st.slider(
+            "Results",
+            1, 10, 5,
+        )
+
+        if st.button(
+            "Search →",
+            type="primary",
+            use_container_width=True,
+        ):
+            if not query.strip():
+                st.warning("Enter a search query.")
+            else:
+                payload = {
+                    "query": query.strip(),
+                    "top_k": top_k,
+                    "document_id": options.get(selected),
+                }
+
+                with st.spinner("Searching..."):
+                    ok, result = api(
+                        "POST",
+                        "/search",
+                        json=payload,
+                    )
+
+                if ok and isinstance(result, dict):
+                    st.session_state.search_results = (
+                        result.get("results", [])
+                    )
+
+    with results_col:
+        st.markdown("### Search results")
+
+        results = st.session_state.search_results
+
+        if results is None:
+            st.info(
+                "Enter a query to discover relevant "
+                "passages from your documents."
+            )
+
+        elif not results:
+            st.info("No matching passages found.")
 
         else:
+            st.caption(f"{len(results)} results found")
 
-            payload = {
-                "query": query,
-                "top_k": top_k,
-                "document_id": (
-                    document_options.get(
-                        selected_document
-                    )
-                ),
-            }
-
-            with st.spinner(
-                "Searching documents..."
-            ):
-
-                success, result = api_request(
-                    "POST",
-                    "/search",
-                    json=payload,
+            for index, match in enumerate(results, 1):
+                title = match.get(
+                    "document_title",
+                    "Untitled",
                 )
+                similarity = match.get("similarity")
 
-            if success and isinstance(
-                result,
-                dict,
-            ):
-
-                matches = result.get(
-                    "results",
-                    [],
-                )
-
-                st.subheader(
-                    f"Found {len(matches)} results"
-                )
-
-                if not matches:
-
-                    st.info(
-                        "No matching document "
-                        "passages were found."
+                with st.container(border=True):
+                    st.markdown(
+                        f'<div class="dm-result-number">'
+                        f'RESULT {index:02d}</div>'
+                        f'<div class="dm-file-title">'
+                        f'{esc(title)}</div>',
+                        unsafe_allow_html=True,
                     )
 
-                else:
+                    meta = (
+                        f"Document #{match.get('document_id', '?')}"
+                        f" · Chunk {match.get('chunk_index', '?')}"
+                    )
 
-                    for index, match in enumerate(
-                        matches,
-                        start=1,
+                    if isinstance(
+                        similarity, (float, int)
                     ):
-
-                        title = match.get(
-                            "document_title",
-                            "Untitled",
+                        meta += (
+                            f" · Similarity {similarity:.3f}"
                         )
 
-                        similarity = match.get(
-                            "similarity",
-                            0,
-                        )
-
-                        with st.expander(
-                            f"Result {index} — "
-                            f"{title} "
-                            f"(Similarity: "
-                            f"{similarity:.3f})"
-                        ):
-
-                            st.write(
-                                match.get(
-                                    "content",
-                                    "",
-                                )
-                            )
-
-                            st.caption(
-                                f"Document ID: "
-                                f"{match.get('document_id')} | "
-                                f"Chunk: "
-                                f"{match.get('chunk_index')}"
-                            )
+                    st.caption(meta)
+                    st.write(match.get("content", ""))
 
 
-# ==========================================
-# Ask AI (RAG)
-# ==========================================
+# -----------------------------------------
+# ASK AI
+# -----------------------------------------
 
 elif page == "Ask AI":
-
-    st.title("🤖 Ask Your Documents")
-
-    st.write(
-        "Ask questions and receive "
-        "AI-generated answers grounded "
-        "in your uploaded PDFs."
+    heading(
+        "Workspace / AI Assistant",
+        "Ask DocuMind.",
+        "Answers grounded in your own documents.",
     )
 
-    selected_document = st.selectbox(
-        "Choose document",
-        ["All documents"]
-        + list(document_options),
+    chat_col, settings_col = st.columns(
+        [3.2, 1],
+        gap="large",
     )
 
-    top_k = st.slider(
-        "Sources to retrieve",
-        min_value=1,
-        max_value=10,
-        value=5,
-        key="ask_top_k",
-    )
+    with settings_col:
+        st.markdown("### Context")
 
-    st.divider()
+        selected = st.selectbox(
+            "Document",
+            ["All documents"] + list(options),
+        )
 
-    # Display existing chat history
-    for chat in st.session_state.chat_history:
+        top_k = st.slider(
+            "Sources",
+            1, 10, 5,
+            key="ask_top_k",
+        )
 
-        with st.chat_message("user"):
-            st.write(
-                chat["question"]
-            )
+        st.divider()
 
-        with st.chat_message("assistant"):
+        st.caption(
+            "DocuMind retrieves relevant passages "
+            "before asking Gemini to generate an answer."
+        )
 
-            st.markdown(
-                chat["answer"]
-            )
+        if st.button(
+            "Clear conversation",
+            use_container_width=True,
+        ):
+            st.session_state.chat_history = []
+            st.rerun()
 
-            with st.expander(
-                "View Sources"
+    with chat_col:
+        if not st.session_state.chat_history:
+            st.markdown("""
+            <div class="dm-hero">
+                <div class="dm-eyebrow">YOUR AI RESEARCH ASSISTANT</div>
+                <div class="dm-hero-title">
+                    What would you like to know?
+                </div>
+                <div class="dm-hero-sub">
+                    Ask a question about your uploaded files.
+                    DocuMind will find relevant context and
+                    generate a grounded response.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        for chat in st.session_state.chat_history:
+            with st.chat_message("user"):
+                st.write(chat["question"])
+
+            with st.chat_message(
+                "assistant",
+                avatar="✦",
             ):
-                show_sources(
-                    chat["sources"]
-                )
+                st.markdown(chat["answer"])
 
-    # New question
-    question = st.chat_input(
-        "Ask a question about your documents..."
-    )
+                with st.expander("Sources"):
+                    render_sources(chat["sources"])
 
-    if question:
+        question = st.chat_input(
+            "Ask your knowledge base..."
+        )
 
-        payload = {
-            "question": question,
-            "top_k": top_k,
-            "document_id": (
-                document_options.get(
-                    selected_document
-                )
-            ),
-        }
+        if question:
+            payload = {
+                "question": question,
+                "top_k": top_k,
+                "document_id": options.get(selected),
+            }
 
-        with st.chat_message("user"):
-            st.write(question)
+            with st.chat_message("user"):
+                st.write(question)
 
-        with st.chat_message("assistant"):
-
-            with st.spinner(
-                "Searching documents "
-                "and asking Gemini..."
+            with st.chat_message(
+                "assistant",
+                avatar="✦",
             ):
-
-                success, result = api_request(
-                    "POST",
-                    "/ask",
-                    json=payload,
-                )
-
-            if success and isinstance(
-                result,
-                dict,
-            ):
-
-                answer = result.get(
-                    "answer",
-                    "",
-                )
-
-                sources = result.get(
-                    "sources",
-                    [],
-                )
-
-                st.markdown(answer)
-
-                with st.expander(
-                    "View Sources"
+                with st.spinner(
+                    "Thinking with your documents..."
                 ):
-                    show_sources(sources)
+                    ok, result = api(
+                        "POST",
+                        "/ask",
+                        json=payload,
+                    )
 
-                st.session_state.chat_history.append({
-                    "question": question,
-                    "answer": answer,
-                    "sources": sources,
-                })
+                if ok and isinstance(result, dict):
+                    answer = result.get("answer", "")
+                    sources = result.get("sources", [])
 
-    st.divider()
+                    st.markdown(answer)
 
-    if st.button(
-        "Clear Chat History",
-        icon="🗑️",
-    ):
+                    with st.expander("Sources"):
+                        render_sources(sources)
 
-        st.session_state.chat_history = []
-
-        st.rerun()
+                    st.session_state.chat_history.append({
+                        "question": question,
+                        "answer": answer,
+                        "sources": sources,
+                    })
